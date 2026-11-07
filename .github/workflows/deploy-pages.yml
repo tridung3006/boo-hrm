@@ -17,24 +17,26 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      VITE_ZALO_APP_ID: ${{ secrets.VITE_ZALO_APP_ID }}
+      VITE_ORGANIZATION_ID: ${{ secrets.VITE_ORGANIZATION_ID }}
+      VITE_LOCAL_AUTH_BYPASS: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-          VITE_ORGANIZATION_ID: ${{ secrets.VITE_ORGANIZATION_ID }}
-          VITE_ZALO_APP_ID: ${{ secrets.VITE_ZALO_APP_ID }}
-          VITE_LOCAL_AUTH_BYPASS: "false"
+      - run: npm run typecheck
+      - run: npm run build -- --base=/boo-hrm/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
   deploy:
     environment:
       name: github-pages
