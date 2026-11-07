@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.resolve-zalo-location]
 verify_jwt = false
+
+[functions.zalo-admin-auth]
+verify_jwt = false

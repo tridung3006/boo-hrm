@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BarChart3, Bell, CalendarClock, Clock3, Download, FileSpreadsheet, LayoutDashboard, MapPinned, MoreHorizontal, Newspaper, Plus, Route, Search, Settings2, TableProperties, TriangleAlert, UserRoundCheck, Users } from "lucide-react";
 import { api, type AdminAttendanceRow, type AdminEmployee } from "../lib/api";
 import { localAuthBypass } from "../lib/supabase";
@@ -27,7 +27,14 @@ function AdminSection({section,data}:{section:Section;data:Awaited<ReturnType<ty
   if(section==="shifts")return <Shifts rows={data.shifts}/>;
   if(section==="news")return <News rows={data.announcements}/>;
   if(section==="schedule")return <Schedule employees={data.employees} shifts={data.shifts}/>;
+  if(section==="settings")return <AdminSettings/>;
   return <EmptyModule title={labels[section]}/>;
+}
+function AdminSettings(){
+  const qc=useQueryClient(),admins=useQuery({queryKey:["zalo-admins"],queryFn:api.zaloAdmins});
+  const add=useMutation({mutationFn:api.addZaloAdmin,onSuccess:()=>qc.invalidateQueries({queryKey:["zalo-admins"]})});
+  const toggle=useMutation({mutationFn:({id,active}:{id:string;active:boolean})=>api.setZaloAdminActive(id,active),onSuccess:()=>qc.invalidateQueries({queryKey:["zalo-admins"]})});
+  return <section className="admin-card admin-admins"><header className="admin-card-head"><div><h2>Quản trị viên đăng nhập bằng Zalo</h2><p>Chỉ Zalo ID đang hoạt động mới có thể đăng nhập trang quản trị.</p></div></header><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);add.mutate({display_name:String(f.get("name")),zalo_user_id:String(f.get("zalo_id"))});e.currentTarget.reset()}}><label>Tên quản trị viên<input name="name" required placeholder="Nguyễn Minh Anh"/></label><label>Zalo User ID<input name="zalo_id" required placeholder="Nhập ID lấy từ tài khoản Zalo"/></label><button className="admin-primary" disabled={add.isPending}><Plus/>Thêm quản trị viên</button></form>{add.error&&<p className="admin-form-error">{add.error.message}</p>}<div className="admin-admin-list">{admins.isLoading?<p>Đang tải…</p>:admins.data?.map(item=><div key={item.id}><span>{item.avatar_url?<img src={item.avatar_url}/>:item.display_name.charAt(0)}</span><div><b>{item.display_name}</b><small>Zalo ID · {item.zalo_user_id}</small></div><button onClick={()=>toggle.mutate({id:item.id,active:!item.active})} className={item.active?"active":""}>{item.active?"Đang hoạt động":"Đã khóa"}</button></div>)}</div></section>
 }
 function Overview({data}:{data:Awaited<ReturnType<typeof api.adminOverview>>}){const pending=data.employees.filter(x=>x.status==="pending");return <><div className="admin-banner"><TriangleAlert/><b>{pending.length+4} việc cần xử lý hôm nay</b><span>{pending.length} nhân viên chờ duyệt · 4 nhân viên chưa có ca tuần tới</span><button>Xem danh sách</button></div><section className="admin-metrics"><Metric icon={<UserRoundCheck/>} value={pending.length} label="Nhân viên chờ duyệt" attention/><Metric icon={<Users/>} value={data.employees.filter(x=>x.status==="active").length} label="Nhân viên hoạt động"/><Metric icon={<Clock3/>} value={data.attendance.filter(x=>x.status==="late").length} label="Lượt đi muộn"/><Metric icon={<CalendarClock/>} value={4} label="Chưa có ca tuần tới"/></section><div className="admin-grid"><section className="admin-card"><CardHead title="Nhân viên chờ duyệt"/><EmployeeTable rows={pending.slice(0,4)} compact/></section><section className="admin-card"><CardHead title="Việc cần xử lý"/><div className="admin-tasks"><Task icon={<CalendarClock/>} title="Chưa có lịch làm việc" meta="4 nhân viên · tuần tới" value="04"/><Task icon={<MapPinned/>} title="Chưa gán địa điểm" meta="2 nhân viên mới" value="02"/><Task icon={<Clock3/>} title="Công bất thường" meta="Thiếu check-out hoặc ngoài ca" value="05"/></div></section></div></>}
 function Metric({icon,value,label,attention}:{icon:React.ReactNode;value:number;label:string;attention?:boolean}){return <article className={`admin-metric ${attention?"attention":""}`}><i>{icon}</i><b>{String(value).padStart(2,"0")}</b><span>{label}</span></article>}
