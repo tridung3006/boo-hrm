@@ -1,0 +1,19 @@
+import { FormEvent, useEffect, useState } from "react";
+import { Clock3, ShieldCheck, UserRoundPlus } from "lucide-react";
+import { localAuthBypass, supabase } from "../lib/supabase";
+import "../access.css";
+
+type Access={state:"loading"|"approved"|"new"|"pending"|"rejected"|"inactive";note?:string};
+export function EmployeeAccessGate({children}:{children:React.ReactNode}){
+  const [access,setAccess]=useState<Access>({state:"loading"}),[error,setError]=useState("");
+  useEffect(()=>{void load()},[]);
+  async function load(){if(localAuthBypass){setAccess({state:"approved"});return}if(!supabase){setAccess({state:"new"});return}const {data:{user}}=await supabase.auth.getUser();if(!user){setAccess({state:"new"});return}const membership=await supabase.from("organization_memberships").select("status,employees(employment_status)").eq("auth_user_id",user.id).maybeSingle();if(membership.data){const employment=(membership.data.employees as unknown as {employment_status:string}|null)?.employment_status;setAccess({state:membership.data.status==="active"&&employment==="active"?"approved":"inactive"});return}const application=await supabase.from("employee_applications").select("status,review_note").eq("auth_user_id",user.id).maybeSingle();if(application.data)setAccess({state:application.data.status as Access["state"],note:application.data.review_note??undefined});else setAccess({state:"new"})}
+  async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();setError("");if(!supabase)return;const organizationId=import.meta.env.VITE_ORGANIZATION_ID as string|undefined;if(!organizationId){setError("Thiếu VITE_ORGANIZATION_ID trong cấu hình triển khai.");return}const {data:{user}}=await supabase.auth.getUser();if(!user)return;const f=new FormData(e.currentTarget),result=await supabase.from("employee_applications").insert({organization_id:organizationId,auth_user_id:user.id,full_name:String(f.get("full_name")),employee_code:String(f.get("employee_code")),phone:String(f.get("phone")||""),email:user.email,requested_department_name:String(f.get("department")||"")});if(result.error){setError(result.error.message);return}setAccess({state:"pending"})}
+  if(access.state==="loading")return <div className="access-page"><p>Đang kiểm tra hồ sơ nhân viên…</p></div>;
+  if(access.state==="approved")return children;
+  if(access.state==="new")return <div className="access-page"><form className="access-card" onSubmit={submit}><i><UserRoundPlus/></i><h1>Đăng ký vào BOO HRM</h1><p>Thông tin sẽ được HR kiểm tra trước khi bạn có thể chấm công.</p><label>Họ và tên<input name="full_name" required minLength={2} autoComplete="name"/></label><label>Mã nhân viên<input name="employee_code" required autoCapitalize="characters"/></label><label>Phòng ban<input name="department" required placeholder="Ví dụ: Kinh doanh"/></label><label>Số điện thoại<input name="phone" inputMode="tel" autoComplete="tel"/></label><button>Gửi yêu cầu</button>{error&&<p className="access-error">{error}</p>}</form></div>;
+  if(access.state==="pending")return <AccessMessage icon={<Clock3/>} title="Hồ sơ đang chờ duyệt" text="HR sẽ kiểm tra thông tin, gán ca làm và địa điểm chấm công. Bạn sẽ vào được màn hình chính sau khi được duyệt."/>;
+  if(access.state==="rejected")return <AccessMessage icon={<ShieldCheck/>} title="Hồ sơ chưa được chấp nhận" text={access.note||"Vui lòng liên hệ HR để kiểm tra lại thông tin đăng ký."}/>;
+  return <AccessMessage icon={<ShieldCheck/>} title="Tài khoản đã ngừng hoạt động" text="Bạn không thể truy cập màn hình chấm công. Nếu đây là nhầm lẫn, vui lòng liên hệ HR."/>;
+}
+function AccessMessage({icon,title,text}:{icon:React.ReactNode;title:string;text:string}){return <div className="access-page"><section className="access-card access-message"><i>{icon}</i><h1>{title}</h1><p>{text}</p></section></div>}

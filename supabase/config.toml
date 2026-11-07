@@ -1,0 +1,13 @@
+project_id = "edmxidmitndxbplghyas"
+
+[functions.verify-attendance]
+verify_jwt = true
+
+[functions.get-current-user]
+verify_jwt = true
+
+[functions.get-attendance-summary]
+verify_jwt = true
+
+[functions.resolve-zalo-location]
+verify_jwt = false

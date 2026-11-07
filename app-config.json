@@ -1,0 +1,17 @@
+{
+  "app": {
+    "title": "BOO HRM",
+    "headerTitle": "BOO HRM",
+    "headerColor": "#f5f5f7",
+    "textColor": "black",
+    "leftButton": "back",
+    "statusBar": "normal",
+    "actionBarHidden": true,
+    "hideAndroidBottomNavigationBar": false,
+    "hideIOSSafeAreaBottom": false
+  },
+  "debug": false,
+  "listCSS": ["assets/app.css"],
+  "listSyncJS": [],
+  "listAsyncJS": ["assets/app.js"]
+}
