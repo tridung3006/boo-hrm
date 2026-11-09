@@ -8,6 +8,8 @@ Deno.serve(async req=>{
   try{
     const {code,codeVerifier,redirectUri}=await req.json();
     if(!code||!codeVerifier||!redirectUri)return json({error:"Thiếu dữ liệu xác thực Zalo."},400);
+    const allowedRedirectUri="https://tridung3006.github.io/boo-hrm/";
+    if(redirectUri!==allowedRedirectUri)return json({error:"Redirect URI quản trị không hợp lệ."},400);
     const appId=Deno.env.get("ZALO_APP_ID")!,secret=Deno.env.get("ZALO_APP_SECRET")!;
     const tokenBody=new URLSearchParams({app_id:appId,code,grant_type:"authorization_code",code_verifier:codeVerifier});
     const tokenResponse=await fetch("https://oauth.zaloapp.com/v4/access_token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded","secret_key":secret},body:tokenBody});
