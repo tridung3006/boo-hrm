@@ -16,7 +16,7 @@ export function AuthGate({children}:{children:React.ReactNode}){
     try{
       await authorize({scopes:['scope.userInfo']});
       const {authCode,authCodeVerify}=await getAuthCode();
-      if(!authCode||!authCodeVerify)throw new Error('Zalo không cấp mã xác thực.');
+      if(!authCode)throw new Error('Zalo không cấp mã xác thực. Vui lòng đóng Mini App và mở lại bằng QR phiên bản mới.');
       const {data,error:invokeError}=await supabase.functions.invoke('zalo-miniapp-auth',{body:{authCode,authCodeVerify}});
       if(invokeError){
         let backendMessage='';

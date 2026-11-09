@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
     const { authCode, authCodeVerify } = await req.json();
-    if (!authCode || !authCodeVerify || typeof authCode !== "string" || typeof authCodeVerify !== "string") {
+    if (!authCode || typeof authCode !== "string") {
       return json({ error: "Thiếu mã xác thực Zalo Mini App." }, 400);
     }
 
@@ -24,8 +24,8 @@ Deno.serve(async (req) => {
       app_id: appId,
       code: authCode,
       grant_type: "authorization_code",
-      code_verifier: authCodeVerify,
     });
+    if (typeof authCodeVerify === "string" && authCodeVerify) tokenBody.set("code_verifier", authCodeVerify);
     const tokenResponse = await fetch("https://oauth.zaloapp.com/v4/access_token", {
       method: "POST",
       headers: {
