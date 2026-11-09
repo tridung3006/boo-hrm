@@ -18,7 +18,13 @@ export function AuthGate({children}:{children:React.ReactNode}){
       const accessToken=await getAccessToken();
       if(!accessToken)throw new Error('Zalo không cấp access token.');
       const {data,error:invokeError}=await supabase.functions.invoke('zalo-miniapp-auth',{body:{accessToken}});
-      if(invokeError||!data?.tokenHash)throw new Error(data?.error||invokeError?.message||'Không thể xác minh tài khoản Zalo.');
+      if(invokeError){
+        let backendMessage='';
+        const response=(invokeError as {context?:Response}).context;
+        if(response)try{backendMessage=String((await response.clone().json())?.error||'')}catch{backendMessage=''}
+        throw new Error(backendMessage||invokeError.message||'Không thể xác minh tài khoản Zalo.');
+      }
+      if(!data?.tokenHash)throw new Error(data?.error||'Không thể xác minh tài khoản Zalo.');
       const {error:verifyError}=await supabase.auth.verifyOtp({token_hash:data.tokenHash,type:'email'});
       if(verifyError)throw verifyError;
     }catch(cause){setError(cause instanceof Error?cause.message:'Không thể đăng nhập bằng Zalo.')}finally{setZaloBusy(false)}

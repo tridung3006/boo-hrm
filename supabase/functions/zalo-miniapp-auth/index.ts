@@ -17,11 +17,22 @@ Deno.serve(async (req) => {
       return json({ error: "Thiếu Zalo access token." }, 400);
     }
 
+    const miniAppId = Deno.env.get("ZALO_MINIAPP_ID") ?? "1909023073860102983";
+    const profileUrl = new URL("https://graph.zalo.me/v2.0/me");
+    profileUrl.searchParams.set("fields", "id,name,picture");
+    profileUrl.searchParams.set("miniapp_id", miniAppId);
     const profileResponse = await fetch(
-      "https://graph.zalo.me/v2.0/me?fields=id,name,picture",
+      profileUrl,
       { headers: { access_token: accessToken } },
     );
-    const profile = (await profileResponse.json()) as ZaloProfile;
+    const profileText = await profileResponse.text();
+    let profile: ZaloProfile;
+    try {
+      profile = JSON.parse(profileText) as ZaloProfile;
+    } catch {
+      console.error("Zalo returned a non-JSON profile response", profileResponse.status, profileText.slice(0, 300));
+      return json({ error: "Zalo không trả về hồ sơ hợp lệ." }, 502);
+    }
     if (!profileResponse.ok || profile.error || !profile.id) {
       console.error("Zalo profile verification failed", profile);
       return json({ error: "Zalo không xác nhận được tài khoản." }, 401);
