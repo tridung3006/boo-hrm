@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { authorize, getAuthCode } from "zmp-sdk";
+import { authorize, getAccessToken, getUserInfo } from "zmp-sdk";
 import { localAuthBypass, supabase } from "../lib/supabase";
 import { isZaloMiniApp } from "../lib/zalo";
 import { EmployeeAccessGate } from "./EmployeeAccessGate";
@@ -15,9 +15,10 @@ export function AuthGate({children}:{children:React.ReactNode}){
     setZaloBusy(true);setError('');
     try{
       await authorize({scopes:['scope.userInfo']});
-      const {authCode,authCodeVerify}=await getAuthCode();
-      if(!authCode)throw new Error('Zalo không cấp mã xác thực. Vui lòng đóng Mini App và mở lại bằng QR phiên bản mới.');
-      const {data,error:invokeError}=await supabase.functions.invoke('zalo-miniapp-auth',{body:{authCode,authCodeVerify}});
+      const [accessToken,{userInfo}]=await Promise.all([getAccessToken(),getUserInfo()]);
+      if(!accessToken||!userInfo?.id)throw new Error('Zalo không cấp thông tin đăng nhập. Vui lòng đóng Mini App và mở lại.');
+      const runtimeAppId=String((window as Window & {APP_ID?:string|number}).APP_ID||'1909023073860102983');
+      const {data,error:invokeError}=await supabase.functions.invoke('zalo-miniapp-auth',{body:{accessToken,miniAppId:runtimeAppId,expectedUserId:userInfo.id}});
       if(invokeError){
         let backendMessage='';
         const response=(invokeError as {context?:Response}).context;

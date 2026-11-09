@@ -12,39 +12,21 @@ type ZaloProfile = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    const { authCode, authCodeVerify } = await req.json();
-    if (!authCode || typeof authCode !== "string") {
-      return json({ error: "Thiếu mã xác thực Zalo Mini App." }, 400);
+    const { accessToken, miniAppId, expectedUserId } = await req.json();
+    if (!accessToken || typeof accessToken !== "string") {
+      return json({ error: "Thiếu access token Zalo Mini App." }, 400);
     }
 
-    const appId = Deno.env.get("ZALO_APP_ID");
-    const appSecret = Deno.env.get("ZALO_APP_SECRET");
-    if (!appId || !appSecret) throw new Error("ZALO_OAUTH_NOT_CONFIGURED");
-    const tokenBody = new URLSearchParams({
-      app_id: appId,
-      code: authCode,
-      grant_type: "authorization_code",
-    });
-    if (typeof authCodeVerify === "string" && authCodeVerify) tokenBody.set("code_verifier", authCodeVerify);
-    const tokenResponse = await fetch("https://oauth.zaloapp.com/v4/access_token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        secret_key: appSecret,
-      },
-      body: tokenBody,
-    });
-    const tokenPayload = await tokenResponse.json();
-    if (!tokenResponse.ok || !tokenPayload.access_token) {
-      console.error("Zalo code exchange failed", tokenPayload);
-      return json({ error: tokenPayload.error_description ?? "Zalo không đổi được mã đăng nhập." }, 401);
-    }
-
+    const configuredAppId = Deno.env.get("ZALO_APP_ID") ?? "";
+    const allowedAppIds = new Set(["1909023073860102983", configuredAppId].filter(Boolean));
+    const verifiedMiniAppId = String(miniAppId ?? "");
+    if (!allowedAppIds.has(verifiedMiniAppId)) return json({ error: "Mini App ID không hợp lệ." }, 403);
     const profileUrl = new URL("https://graph.zalo.me/v2.0/me");
     profileUrl.searchParams.set("fields", "id,name,picture");
+    profileUrl.searchParams.set("miniapp_id", verifiedMiniAppId);
     const profileResponse = await fetch(
       profileUrl,
-      { headers: { access_token: tokenPayload.access_token } },
+      { headers: { access_token: accessToken } },
     );
     const profileText = await profileResponse.text();
     let profile: ZaloProfile;
@@ -56,8 +38,9 @@ Deno.serve(async (req) => {
     }
     if (!profileResponse.ok || profile.error || !profile.id) {
       console.error("Zalo profile verification failed", profile);
-      return json({ error: "Zalo không xác nhận được tài khoản." }, 401);
+      return json({ error: profile.message ?? "Zalo không xác nhận được tài khoản." }, 401);
     }
+    if (expectedUserId && String(expectedUserId) !== String(profile.id)) return json({ error: "Danh tính Zalo không khớp." }, 401);
 
     const url = Deno.env.get("SUPABASE_URL")!;
     const serviceKey =
