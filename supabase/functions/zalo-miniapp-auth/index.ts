@@ -38,9 +38,13 @@ Deno.serve(async (req) => {
     }
     if (!profileResponse.ok || profile.error || !profile.id) {
       console.error("Zalo profile verification failed", profile);
-      const blockedByRegion = String(profile.message ?? "")
-        .toLowerCase()
-        .includes("ip not inside vietnam");
+      // Zalo has returned several spellings for this restriction, including
+      // "Vietnam", "Viet Nam", and messages with "IP address" in between.
+      const regionalErrorText = `${String(profile.message ?? "")} ${profileText}`
+        .replace(/\s+/g, " ")
+        .trim();
+      const blockedByRegion = /\bip\b.*\b(?:not|outside)\b.*(?:\bviet\s*nam\b|\bvn\b)/i
+        .test(regionalErrorText);
       const allowClientFallback = Deno.env.get("ALLOW_ZALO_CLIENT_PROFILE_FALLBACK") === "true";
       const fallbackId = String(clientProfile?.id ?? "");
       const fallbackName = String(clientProfile?.name ?? "").trim();
