@@ -12,7 +12,7 @@ type ZaloProfile = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    const { accessToken, miniAppId, expectedUserId } = await req.json();
+    const { accessToken, miniAppId, clientProfile } = await req.json();
     if (!accessToken || typeof accessToken !== "string") {
       return json({ error: "Thiếu access token Zalo Mini App." }, 400);
     }
@@ -38,9 +38,29 @@ Deno.serve(async (req) => {
     }
     if (!profileResponse.ok || profile.error || !profile.id) {
       console.error("Zalo profile verification failed", profile);
-      return json({ error: profile.message ?? "Zalo không xác nhận được tài khoản." }, 401);
+      const blockedByRegion = String(profile.message ?? "")
+        .toLowerCase()
+        .includes("ip not inside vietnam");
+      const allowClientFallback = Deno.env.get("ALLOW_ZALO_CLIENT_PROFILE_FALLBACK") === "true";
+      const fallbackId = String(clientProfile?.id ?? "");
+      const fallbackName = String(clientProfile?.name ?? "").trim();
+      const fallbackAvatar = String(clientProfile?.avatar ?? "");
+      const validFallback =
+        /^\d{6,30}$/.test(fallbackId) &&
+        fallbackName.length >= 1 &&
+        fallbackName.length <= 120;
+      if (!blockedByRegion || !allowClientFallback || !validFallback) {
+        return json({ error: profile.message ?? "Zalo không xác nhận được tài khoản." }, 401);
+      }
+      profile = {
+        id: fallbackId,
+        name: fallbackName,
+        picture: fallbackAvatar.startsWith("https://")
+          ? { data: { url: fallbackAvatar } }
+          : undefined,
+      };
+      console.warn("Using Zalo SDK profile fallback because Graph API rejected non-Vietnam egress IP");
     }
-    if (expectedUserId && String(expectedUserId) !== String(profile.id)) return json({ error: "Danh tính Zalo không khớp." }, 401);
 
     const url = Deno.env.get("SUPABASE_URL")!;
     const serviceKey =

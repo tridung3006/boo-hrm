@@ -18,7 +18,11 @@ export function AuthGate({children}:{children:React.ReactNode}){
       const [accessToken,{userInfo}]=await Promise.all([getAccessToken(),getUserInfo()]);
       if(!accessToken||!userInfo?.id)throw new Error('Zalo không cấp thông tin đăng nhập. Vui lòng đóng Mini App và mở lại.');
       const runtimeAppId=String((window as Window & {APP_ID?:string|number}).APP_ID||'1909023073860102983');
-      const {data,error:invokeError}=await supabase.functions.invoke('zalo-miniapp-auth',{body:{accessToken,miniAppId:runtimeAppId,expectedUserId:userInfo.id}});
+      const {data,error:invokeError}=await supabase.functions.invoke('zalo-miniapp-auth',{body:{
+        accessToken,
+        miniAppId:runtimeAppId,
+        clientProfile:{id:userInfo.id,name:userInfo.name,avatar:userInfo.avatar},
+      }});
       if(invokeError){
         let backendMessage='';
         const response=(invokeError as {context?:Response}).context;
