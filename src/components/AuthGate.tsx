@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { authorize, getAccessToken } from "zmp-sdk";
+import { authorize, getAuthCode } from "zmp-sdk";
 import { localAuthBypass, supabase } from "../lib/supabase";
 import { isZaloMiniApp } from "../lib/zalo";
 import { EmployeeAccessGate } from "./EmployeeAccessGate";
@@ -15,9 +15,9 @@ export function AuthGate({children}:{children:React.ReactNode}){
     setZaloBusy(true);setError('');
     try{
       await authorize({scopes:['scope.userInfo']});
-      const accessToken=await getAccessToken();
-      if(!accessToken)throw new Error('Zalo không cấp access token.');
-      const {data,error:invokeError}=await supabase.functions.invoke('zalo-miniapp-auth',{body:{accessToken}});
+      const {authCode,authCodeVerify}=await getAuthCode();
+      if(!authCode||!authCodeVerify)throw new Error('Zalo không cấp mã xác thực.');
+      const {data,error:invokeError}=await supabase.functions.invoke('zalo-miniapp-auth',{body:{authCode,authCodeVerify}});
       if(invokeError){
         let backendMessage='';
         const response=(invokeError as {context?:Response}).context;

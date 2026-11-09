@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.zalo-miniapp-auth]
 verify_jwt = false
+
+[functions.approve-employee-application]
+verify_jwt = true

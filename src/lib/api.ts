@@ -45,6 +45,7 @@ export const api = {
   zaloAdmins: async():Promise<ZaloAdmin[]> => {if(localAuthBypass)return [];if(!supabase)throw new Error('Chưa kết nối Supabase.');const {data,error}=await supabase.from('admin_zalo_accounts').select('id,zalo_user_id,display_name,avatar_url,active,created_at').order('created_at');if(error)throw error;return data as ZaloAdmin[]},
   addZaloAdmin: async(input:{zalo_user_id:string;display_name:string}):Promise<void> => {if(!supabase)throw new Error('Chưa kết nối Supabase.');const me=await api.currentUser();const {data:{user}}=await supabase.auth.getUser();const {error}=await supabase.from('admin_zalo_accounts').insert({organization_id:me.organization.id,zalo_user_id:input.zalo_user_id.trim(),display_name:input.display_name.trim(),created_by:user?.id});if(error)throw error},
   setZaloAdminActive: async(id:string,active:boolean):Promise<void> => {if(!supabase)throw new Error('Chưa kết nối Supabase.');const {error}=await supabase.from('admin_zalo_accounts').update({active,updated_at:new Date().toISOString()}).eq('id',id);if(error)throw error},
+  approveEmployeeApplication: (applicationId:string) => invoke<{employeeId:string;status:string}>('approve-employee-application',{applicationId}),
 };
 
 const devUser:CurrentUser={employee:{id:'local-admin',full_name:'Dũng Hằng',avatar_url:null,position:'Quản trị viên',department_name:'Điều hành'},organization:{id:'local-org',name:'Công ty của tôi'},branch:{id:'local-branch',name:'Văn phòng chính',allowed_radius_meters:50},role:'admin'};

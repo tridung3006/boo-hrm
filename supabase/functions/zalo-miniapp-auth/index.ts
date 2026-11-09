@@ -12,18 +12,39 @@ type ZaloProfile = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    const { accessToken } = await req.json();
-    if (!accessToken || typeof accessToken !== "string") {
-      return json({ error: "Thiếu Zalo access token." }, 400);
+    const { authCode, authCodeVerify } = await req.json();
+    if (!authCode || !authCodeVerify || typeof authCode !== "string" || typeof authCodeVerify !== "string") {
+      return json({ error: "Thiếu mã xác thực Zalo Mini App." }, 400);
     }
 
-    const miniAppId = Deno.env.get("ZALO_MINIAPP_ID") ?? "1909023073860102983";
+    const appId = Deno.env.get("ZALO_APP_ID");
+    const appSecret = Deno.env.get("ZALO_APP_SECRET");
+    if (!appId || !appSecret) throw new Error("ZALO_OAUTH_NOT_CONFIGURED");
+    const tokenBody = new URLSearchParams({
+      app_id: appId,
+      code: authCode,
+      grant_type: "authorization_code",
+      code_verifier: authCodeVerify,
+    });
+    const tokenResponse = await fetch("https://oauth.zaloapp.com/v4/access_token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        secret_key: appSecret,
+      },
+      body: tokenBody,
+    });
+    const tokenPayload = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokenPayload.access_token) {
+      console.error("Zalo code exchange failed", tokenPayload);
+      return json({ error: tokenPayload.error_description ?? "Zalo không đổi được mã đăng nhập." }, 401);
+    }
+
     const profileUrl = new URL("https://graph.zalo.me/v2.0/me");
     profileUrl.searchParams.set("fields", "id,name,picture");
-    profileUrl.searchParams.set("miniapp_id", miniAppId);
     const profileResponse = await fetch(
       profileUrl,
-      { headers: { access_token: accessToken } },
+      { headers: { access_token: tokenPayload.access_token } },
     );
     const profileText = await profileResponse.text();
     let profile: ZaloProfile;
@@ -82,8 +103,23 @@ Deno.serve(async (req) => {
       if (insertError && insertError.code !== "23505") throw insertError;
     }
 
+    const { data: adminMembership } = await admin
+      .from("organization_memberships")
+      .select("organization_id")
+      .eq("role", "admin")
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+    const organizationId = adminMembership?.organization_id;
+    if (!organizationId) throw new Error("ORGANIZATION_NOT_CONFIGURED");
+    const { error: metadataError } = await admin.auth.admin.updateUserById(authUserId, {
+      app_metadata: { organization_id: organizationId, identity_provider: "zalo" },
+    });
+    if (metadataError) throw metadataError;
+
     return json({
       tokenHash: link.data.properties.hashed_token,
+      organizationId,
       profile: {
         id: providerUserId,
         name: profile.name ?? "Zalo User",
